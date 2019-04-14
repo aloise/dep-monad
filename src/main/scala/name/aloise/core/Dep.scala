@@ -40,18 +40,24 @@ trait Dep2[A] { self =>
                 EwoI <: HList,
                 CombinedEnv <: HList,
                 CombinedEnvMinusInjected <: HList,
+                AllEnv <: HList,
                 B]
             (f: A => Dep2.Aux[Env2, Inj2, B])
             (implicit union: Union.Aux[Env, Env2, CombinedEnv],
              injUnique: NotContainsConstraint[self.Inj, B],
-             detach: Detach[Env2, _, CombinedEnv],
+             detach: Detach[Env2, Env, CombinedEnv],
+             union2: Union.Aux[CombinedEnvMinusInjected, A :: Inj, AllEnv],
              diff: Diff.Aux[CombinedEnv, B :: self.Inj, CombinedEnvMinusInjected]
             ): Dep2.Aux[CombinedEnvMinusInjected, A :: Inj, B] = new Dep2[B] {
     override type Env = CombinedEnvMinusInjected
     override type Inj = A :: self.Inj
 
-    override protected def runWithEnv(environment: Env): B = {
-      self.runWithEnv()
+    override protected def runWithEnv(environment: CombinedEnvMinusInjected): B = {
+      val globalEnv = union2(environment, ???)
+      val (env2, env) = detach(combinedWithInjected)
+      val parentResult = self.runWithEnv(env)
+
+      f(parentResult).runWithEnv(env2)
     }
   }
 }

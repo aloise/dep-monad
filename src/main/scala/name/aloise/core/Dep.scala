@@ -10,25 +10,29 @@ import scala.language.higherKinds
 
 trait Dep2[A] { self =>
 
-  type Env <: HList
-  type Inj <: HList // all injected and captured params - ie all "A" types
-  type EnvWoInj <: HList
+  type Env <: HList // environment minus internally provided types
+  type Inj <: HList // all injected and captured params - ie all output "A" types
 
-  protected def runWithInjected(environment: EnvWoInj, injected: Inj): A
+  protected def runWithInjected(environment: Env, injected: Inj): A
 
-  def run(implicit envNil: HNil =:= EnvWoInj, injNil: HNil =:= Inj): A =
+  def run(implicit envNil: HNil =:= Env, injNil: HNil =:= Inj): A =
     runWithInjected(envNil(HNil), injNil(HNil))
 
-  def run(env: EnvWoInj)(implicit eq: HNil =:= Inj): A =
+  def run(env: Env)(implicit eq: HNil =:= Inj): A =
     runWithInjected(env, eq(HNil))
 
-  def map[B, EnvWoInjOut <: HList](f: A => B)(implicit filter: FilterNot.Aux[Env, B, EnvWoInjOut]): Dep2.Aux[Env, B :: Inj, EnvWoInjOut, B] = new Dep2[B] {
-    override type Env = self.Env
-    override type Inj = B :: self.Inj
-    override type EnvWoInj = EnvWoInjOut
+  def map[B, EnvWoInjOut <: HList](f: A => B)
+                                                    (implicit filterNot: Remove.Aux[Env, A, EnvWoInjOut],
+                                                     injUnique: NotContainsConstraint[self.Inj, A],
+                                                    ): Dep2.Aux[EnvWoInjOut, A :: Inj, B] = new Dep2[B] {
+    override type Env = EnvWoInjOut
+    override type Inj = A :: self.Inj
 
-    override protected def runWithInjected(environment: EnvWoInj, injected: Inj): B = {
-      val parentRun = self.runWithInjected(environment, injected.tail)
+    override protected def runWithInjected(environment: Env, injected: Inj): B = {
+      val parentEnv = filterNot.reinsert(environment)
+
+      val parentRun = self.runWithInjected(parentEnv, injected.tail)
+
       val mapped = f(parentRun)
       mapped
     }
@@ -41,40 +45,36 @@ trait Dep2[A] { self =>
                 CombinedEnv <: HList,
                 CombinedEnvMinusInjected <: HList,
                 B]
-            (f: A => Dep2.Aux[Env2, Inj2, EwoI, B])
+            (f: A => Dep2.Aux[Env2, Inj2, B])
             (implicit union: Union.Aux[Env, Env2, CombinedEnv],
              injUnique: NotContainsConstraint[self.Inj, B],
              diff: Diff.Aux[CombinedEnv, B :: self.Inj, CombinedEnvMinusInjected]
-            ): Dep2.Aux[CombinedEnv, B :: Inj, CombinedEnvMinusInjected, B] = new Dep2[B] {
+            ): Dep2.Aux[CombinedEnv, A :: Inj, B] = new Dep2[B] {
     override type Env = CombinedEnv
-    override type Inj = B :: self.Inj
-    override type EnvWoInj = CombinedEnvMinusInjected
+    override type Inj = A :: self.Inj
 
-    override protected def runWithInjected(environment: EnvWoInj, injected: Inj): B = ???
+    override protected def runWithInjected(environment: Env, injected: Inj): B = ???
   }
 }
 
 object Dep2 {
-  type Aux[E, I, EwoI, A1] = Dep2[A1]{
+  type Aux[E, I, A1] = Dep2[A1]{
     type Env = E
     type Inj = I
-    type EnvWoInj = EwoI
   }
 
-  def pure[A](f: => A): Aux[HNil, A :: HNil, HNil, A] = new Dep2[A] {
+  def pure[A](f: => A): Aux[HNil, HNil, A] = new Dep2[A] {
     override type Env = HNil
-    override type Inj = A :: HNil
-    override type EnvWoInj = HNil
+    override type Inj = HNil
 
-    override protected def runWithInjected(environment: EnvWoInj, injected: Inj): A = f
+    override protected def runWithInjected(environment: Env, injected: Inj): A = f
   }
 
-  def reader[A,B](f: A => B): Aux[A :: HNil, B :: HNil, A :: HNil, B] = new Dep2[B] {
+  def reader[A,B](f: A => B): Aux[A :: HNil, A :: HNil, B] = new Dep2[B] {
     override type Env = A :: HNil
-    override type Inj = B :: HNil
-    override type EnvWoInj = A :: HNil
+    override type Inj = A :: HNil
 
-    override protected def runWithInjected(environment: EnvWoInj, injected: Inj): B = f(environment.head)
+    override protected def runWithInjected(environment: Env, injected: Inj): B = f(environment.head)
   }
 }
 
@@ -82,19 +82,29 @@ object Test {
 
   import Dep2._
 
-  val ad: Aux[HNil, Int :: HNil, HNil, Int] = pure(1)
-  val bd: Aux[HNil, String :: HNil, HNil, String] = pure("str")
+  val ad = pure(1)
+  val bd = pure("str")
 
-  val x = ad.flatMap(a => bd).map(x => x.length)
+
+  val a = 1 :: "test" :: "test2" :: 1L :: "test3" :: HNil
+  val b = 1 :: "x" :: true :: HNil
+
+  def uni[A <: HList, B <: HList, C <: HList](a: A, b: B)(implicit un: Intersection.Aux[A, B, C]):C =
+    un(a)
+
+
+  val c = uni(a, b)
+
+
 
 //  val dep = for {
 //    a <- ad
 //    b <- bd
 //  } yield a + b.length
 //
-//  def main(args: Array[String]): Unit = {
-//    println(dep.run)
-//  }
+  def main(args: Array[String]): Unit = {
+    println(c)
+  }
 
 
 }

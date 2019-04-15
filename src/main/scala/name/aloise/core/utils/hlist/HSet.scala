@@ -51,18 +51,26 @@ object hset {
 
     implicit def hlistOps[L <: HSet](l: L): HSetOps[L] = new HSetOps(l)
 
-    implicit def genericHEmpty: Generic.Aux[HEmpty, HNil] = new Generic[HEmpty] {
-      override type Repr = HNil
-      override def to(t: HEmpty): HNil = HNil
-      override def from(r: HNil): HEmpty = HEmpty
+  }
+
+  trait ToHList[L <: HSet] extends DepFn1[L]{
+    type Out <: HList
+  }
+
+  object ToHList {
+    type Aux[L <: HSet, H <: HList] = ToHList[L] { type Out = H }
+
+    def apply[L <: HSet](implicit toHList: ToHList[L]): ToHList[L] = toHList
+
+    implicit val toEmptyHList: Aux[HEmpty.type, HNil.type] = new ToHList[HEmpty.type] {
+      override type Out = HNil.type
+      override def apply(t: HEmpty.type): HNil.type = HNil
     }
 
-    implicit def generic[H, T <: HSet, Out1 <: HList](implicit gen2: Generic.Aux[T, Out1], notContains: NotContains[T, H]): Generic.Aux[H :+: T, H :: Out1] = new Generic[H :+: T] {
-      override type Repr = H :: Out1
-      override def to(t: H :+: T): H :: Out1 = t.head :: gen2.to(t.tail)
-      override def from(r: H :: Out1): H :+: T = r.head :+: gen2.from(r.tail)
-    }
-
+//    implicit val toEmptyHList2: Aux[HEmpty, HNil] = new ToHList[HEmpty] {
+//      override type Out = HNil
+//      override def apply(t: HEmpty): HNil = HNil
+//    }
   }
 
 
@@ -214,13 +222,13 @@ object hset {
   object Exclude extends Priority1Exclude {
 
     implicit def nonEmptyExclude[L <: HSet, RH, RT <: HSet, Out1 <: HSet, Out2 <: HSet]
-    (implicit remove: Remove.Aux[L, RH, Out1],
-     exclude2: Aux[Out1, RT, Out2]
-    ): Exclude.Aux[L, RH :+: RT, Out2] =
-      new Exclude[L, RH :+: RT] {
-        override type Out = Out2
-        override def apply(t: L, u: RH :+: RT): Out2 = exclude2(remove(t), u.tail)
-      }
+      (implicit remove: Remove.Aux[L, RH, Out1],
+       exclude2: Aux[Out1, RT, Out2]
+      ): Exclude.Aux[L, RH :+: RT, Out2] =
+        new Exclude[L, RH :+: RT] {
+          override type Out = Out2
+          override def apply(t: L, u: RH :+: RT): Out2 = exclude2(remove(t), u.tail)
+        }
   }
 
   trait Remove[L <: HSet, U] extends DepFn1[L] {

@@ -53,11 +53,8 @@ trait Dep2[A] { self =>
     override type Inj = A :: self.Inj
 
     override protected def runWithEnv(environment: CombinedEnvMinusInjected): B = {
-      val globalEnv = union2(environment, ???)
-      val (env2, env) = detach(combinedWithInjected)
-      val parentResult = self.runWithEnv(env)
 
-      f(parentResult).runWithEnv(env2)
+        ???
     }
   }
 }
@@ -87,13 +84,8 @@ object Test {
 
   import Dep2._
 
-  val dep = for {
-    a <- pure(5)
-    b <- pure("str")
-  } yield a + b.length
+  def main2(args: Array[String]): Unit = {
 
-  def main(args: Array[String]): Unit = {
-    println(dep.run)
   }
 
 

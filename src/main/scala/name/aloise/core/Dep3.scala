@@ -100,15 +100,15 @@ object Test2 {
 
     val a = A(12) :+: true :+: "hello world" :+: 1 :+: HEmpty
 
-    val b = C(15) :+: A(15) :+: HEmpty
-    //
-    //
+    val b = C(15) :+: A(15) :+: "str" :+: HEmpty
+
     // println((a join b join c).replace[String]("replaced2"))
 
     // println(("str" :+: HEmpty) union (HEmpty))
     // println(Union.hsetEmptyUnion.apply(HEmpty, 1 :+: "str" :+: HEmpty))
 
-    println(a union b)
+    // println(a union b)
+    // println(a.remove[A].remove[Boolean].remove[B])
 
     // println(dep.run)
 

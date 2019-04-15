@@ -39,7 +39,7 @@ object hset {
 
     def replace[U](elem: U)(implicit replace: Replace[L, U]): L = replace(l, elem)
 
-    def remove[U](implicit rm: Remove.Aux[L, U, _]): rm.Out = rm(l)
+    def remove[U](implicit rm: Remove[L, U]): rm.Out = rm(l)
 
     def union[R <: HSet, Out <: HSet](r: R)(implicit uni: Union.Aux[L, R, Out]): Out =
       uni(l, r)
@@ -178,12 +178,12 @@ object hset {
     implicit def hsetUnion[H, T <: HSet, M <: HSet, U <: HSet, MR <: HSet]
       (implicit
        remove: Remove.Aux[M, H, MR],
-       unionTail: Union.Aux[T, H :+: M, U]
+       unionTail: Union.Aux[T, H :+: MR, U]
       ): Aux[H :+: T, M, U] =
         new Union[H :+: T, M] {
           override type Out = U
           override def apply(t: H :+: T, m: M): Out =
-            unionTail(t.tail, :+:(t.head, m))
+            unionTail(t.tail, :+:(t.head, remove(m)))
         }
   }
 
@@ -246,9 +246,13 @@ object hset {
     }
 
     implicit def recurseRemoveFromHSet[H, T <: HSet, U, Out1 <: HSet]
-    (implicit rm: Remove.Aux[T, U, Out1], neq: H =:!= U, ct: NotContains[Out1, H]): Remove.Aux[H :+: T, U, H :+: Out1] = new Remove[H :+: T, U] {
-      type Out = H :+: Out1
-      override def apply(t: H :+: T): Out = t.head :+: rm(t.tail)
-    }
+    (implicit rm: Remove.Aux[T, U, Out1],
+     neq: H =:!= U,
+     ct: NotContains[Out1, H]
+    ): Remove.Aux[H :+: T, U, H :+: Out1] =
+      new Remove[H :+: T, U] {
+        type Out = H :+: Out1
+        override def apply(t: H :+: T): Out = t.head :+: rm(t.tail)
+      }
   }
 }

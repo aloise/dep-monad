@@ -139,7 +139,7 @@ private[core] object hset {
 
 }
 
-trait Dep[A] {
+trait Dep[+A] {
   self =>
 
   import hset._

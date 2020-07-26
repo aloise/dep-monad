@@ -1,5 +1,6 @@
 package name.aloise.core
 
+import shapeless.HNil
 
 private[core] object hset {
 
@@ -272,6 +273,7 @@ object Dep {
 object Test2 {
 
   import Dep._
+  import shapeless.::
 
   // inputs
   case class A1(i: Int)
@@ -297,9 +299,9 @@ object Test2 {
 
   val dep = for {
     b1 <- pure(B1(5))
-    b2 <- pure(B2(15))
+    _ <- pure(B2(15))
     _ <- reader{(str: String, str2: B1) => str.length }
-    _ <- reader{(sameStr: String, b2: B2, b3: B3) => B4(1) }
+    _ <- reader{(sameStr: String, b2: B2, b3: B3) => B4(1 + sameStr.length) }
     _ <- reader{(str: String, str2: B1) => str.length }
     _ <- reader{(sameStr3: String, b2: B2, b3: B3) => B4(4) }
     _ <- reader{(str: String, str2: B1) => str.length }
@@ -312,7 +314,7 @@ object Test2 {
     len <- reader{(str: String, str2: B1) => Dep2B1(str.length) }
     len2 = len.i*2
     _ <- reader{b1: B1 => B2(b1.i)}
-    _ <- reader{(sameStr4: String, b2: B2, b3: B3) => B5(5) }
+    _ <- reader{(sameStr4: String, b2: B2, b3: B3) => B5(5*2 + sameStr4.length + b3.i) }
     fn <- reader{ f: Final => f.i * 2L}
   } yield AnotherFinal(len2+fn.toInt)
 

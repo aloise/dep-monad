@@ -1,7 +1,7 @@
 # dep-monad
 Scala - Dependency injection monad - experiments.
 
-Satisfy dependencies in the for comprehension. 
+It would satisfy dependencies in the for comprehension during the compilation. 
 
 ```
   val dep = for {
